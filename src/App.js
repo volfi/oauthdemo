@@ -1,27 +1,46 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useEffect, useState } from 'react';
+import Amplify, { Auth, Hub } from 'aws-amplify';
+import awsconfig from './aws-exports';
 
-import { Auth } from 'aws-amplify'
+Amplify.configure(awsconfig);
 
 function App() {
-    async function checkUser() {
-        const user = await Auth.currentAuthenticatedUser()
-        console.log('user: ' , user)
-    }
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    Hub.listen('auth', ({ payload: { event, data } }) => {
+      switch (event) {
+        case 'signIn':
+        case 'cognitoHostedUI':
+          getUser().then(userData => setUser(userData));
+          break;
+        case 'signOut':
+          setUser(null);
+          break;
+        case 'signIn_failure':
+        case 'cognitoHostedUI_failure':
+          console.log('Sign in failure', data);
+          break;
+      }
+    });
+
+    getUser().then(userData => setUser(userData));
+  }, []);
+
+  function getUser() {
+    return Auth.currentAuthenticatedUser()
+      .then(userData => userData)
+      .catch(() => console.log('Not signed in'));
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <button
-            onClick = {() => Auth.federatedSignIn({provider : "Google"})}
-        >Sign in with Google</button>
-        <button
-            onClick = {() => Auth.federatedSignIn()}
-        >Sign in</button>
-          <button
-            onClick = {checkUser}
-        >Check User</button>
-      </header>
+    <div>
+      <p>{user ? JSON.stringify("heelllo") : 'None'}</p>
+      {user ? (
+        <button onClick={() => Auth.signOut()}>Sign Out</button>
+      ) : (
+        <button onClick={() => Auth.federatedSignIn()}>Federated Sign In</button>
+      )}
     </div>
   );
 }
